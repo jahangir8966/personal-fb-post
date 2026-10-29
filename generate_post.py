@@ -26,14 +26,50 @@ prompt = f"""
 ৫. কোনো হ্যাশট্যাগ (#) ব্যবহার করবে না এবং লেখার শুরুতে বা শেষে কোনো অতিরিক্ত কথা লিখবে না। শুধু মূল স্ট্যাটাসটুকু লিখবে।
 """
 
-response = client.models.generate_content(
-    model="gemini-3.0-flash",
-    contents=prompt,
-)
+# যে মডেলগুলো একে একে চেক করবে
+models_to_try = [
+    "gemini-3-flash-preview",
+    "gemini-3.0-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-flash-latest"
+]
 
-post_text = response.text.strip()
+post_text = None
+
+for model_name in models_to_try:
+    try:
+        print(f"Trying model: {model_name}")
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+        )
+        post_text = response.text.strip()
+        print(f"Success with {model_name}!")
+        break
+    except Exception as e:
+        print(f"Model {model_name} failed: {e}")
+
+# ওপরের তালিকায় না পেলে অ্যাকাউন্টের চালু থাকা যেকোনো flash মডেল নিজে খুঁজে নেবে
+if not post_text:
+    for m in client.models.list():
+        if "flash" in m.name.lower() and "tts" not in m.name.lower() and "image" not in m.name.lower():
+            try:
+                print(f"Auto-detected model: {m.name}")
+                response = client.models.generate_content(
+                    model=m.name,
+                    contents=prompt,
+                )
+                post_text = response.text.strip()
+                print(f"Success with {m.name}!")
+                break
+            except Exception as e:
+                continue
+
+if not post_text:
+    raise Exception("Could not generate post. Please check your GEMINI_API_KEY.")
 
 with open("latest_post.txt", "w", encoding="utf-8") as f:
     f.write(post_text)
 
-print("Post generated successfully!")
+print("Post saved to latest_post.txt successfully!")
